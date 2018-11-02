@@ -22,6 +22,7 @@ $verbosity = Get-AnsibleParam -obj $params -name "_ansible_verbosity" -type "int
 $name = Get-AnsibleParam -obj $params -name "name" -type "list" -failifempty $true
 
 $allow_empty_checksums = Get-AnsibleParam -obj $params -name "allow_empty_checksums" -type "bool" -default $false
+$allowmultiple = Get-AnsibleParam -obj $params -name "allowmultiple" -type "bool" -default $false
 $allow_prerelease = Get-AnsibleParam -obj $params -name "allow_prerelease" -type "bool" -default $false
 $architecture = Get-AnsibleParam -obj $params -name "architecture" -type "str" -default "default" -validateset "default", "x86"
 $install_args = Get-AnsibleParam -obj $params -name "install_args" -type "str"
@@ -40,7 +41,6 @@ $state = Get-AnsibleParam -obj $params -name "state" -type "str" -default "prese
 $timeout = Get-AnsibleParam -obj $params -name "timeout" -type "int" -default 2700 -aliases "execution_timeout"
 $validate_certs = Get-AnsibleParam -obj $params -name "validate_certs" -type "bool" -default $true
 $version = Get-AnsibleParam -obj $params -name "version" -type "str"
-$choco_cmd_options = Get-AnsibleParam -obj $params -name "choco_cmd_options" -type "str"
 
 $result = @{
     changed = $false
@@ -75,6 +75,7 @@ Function Get-InstallChocolateyArguments {
     param(
         [bool]$allow_downgrade,
         [bool]$allow_empty_checksums,
+        [bool]$allowmultiple,
         [bool]$allow_prerelease,
         [String]$architecture,
         [bool]$force,
@@ -89,8 +90,7 @@ Function Get-InstallChocolateyArguments {
         [String]$source_usename,
         [String]$source_password,
         [int]$timeout,
-        [String]$version,
-        [String]$choco_cmd_options
+        [String]$version
     )
     # returns an ArrayList of common arguments for install/updated a Chocolatey
     # package
@@ -103,6 +103,9 @@ Function Get-InstallChocolateyArguments {
     }
     if ($allow_empty_checksums) {
         $arguments.Add("--allow-empty-checksums") > $null
+    }
+    if ($allowmultiple) {
+        $arguments.Add("--allowmultiple") > $null
     }
     if ($allow_prerelease) {
         $arguments.Add("--prerelease") > $null
@@ -319,6 +322,7 @@ Function Update-ChocolateyPackage {
         [Parameter(Mandatory=$true)][String[]]$packages,
         [bool]$allow_downgrade,
         [bool]$allow_empty_checksums,
+        [bool]$allowmultiple,
         [bool]$allow_prerelease,
         [String]$architecture,
         [bool]$force,
@@ -334,20 +338,19 @@ Function Update-ChocolateyPackage {
         [String]$source_username,
         [String]$source_password,
         [int]$timeout,
-        [String]$version,
-        [String]$choco_cmd_options
+        [String]$version
     )
 
     $arguments = [System.Collections.ArrayList]@($choco_path, "upgrade")
     $arguments.AddRange($packages)
     $common_args = Get-InstallChocolateyArguments -allow_downgrade $allow_downgrade `
-        -allow_empty_checksums $allow_empty_checksums -allow_prerelease $allow_prerelease `
-        -architecture $architecture -force $force -ignore_checksums $ignore_checksums `
-        -ignore_dependencies $ignore_dependencies -install_args $install_args `
-        -package_params $package_params -proxy_url $proxy_url -proxy_username $proxy_username `
-        -proxy_password $proxy_password -skip_scripts $skip_scripts -source $source `
-        -source_username $source_username -source_password $source_password -timeout $timeout `
-        -version $version -choco_cmd_options $choco_cmd_options
+        -allow_empty_checksums $allow_empty_checksums -allowmultiple $allowmultiple `
+        -allow_prerelease $allow_prerelease -architecture $architecture -force $force `
+        -ignore_checksums $ignore_checksums -ignore_dependencies $ignore_dependencies `
+        -install_args $install_args -package_params $package_params -proxy_url $proxy_url `
+        -proxy_username $proxy_username -proxy_password $proxy_password `
+        -skip_scripts $skip_scripts -source $source -source_username $source_username `
+        -source_password $source_password -timeout $timeout -version $version
     $arguments.AddRange($common_args)
 
     $command = Argv-ToString -arguments $arguments
@@ -379,6 +382,7 @@ Function Install-ChocolateyPackage {
         [Parameter(Mandatory=$true)][String[]]$packages,
         [bool]$allow_downgrade,
         [bool]$allow_empty_checksums,
+        [bool]$allowmultiple,
         [bool]$allow_prerelease,
         [String]$architecture,
         [bool]$force,
@@ -394,20 +398,19 @@ Function Install-ChocolateyPackage {
         [String]$source_username,
         [String]$source_password,
         [int]$timeout,
-        [String]$version,
-        [String]$choco_cmd_options
+        [String]$version
     )
 
     $arguments = [System.Collections.ArrayList]@($choco_path, "install")
     $arguments.AddRange($packages)
     $common_args = Get-InstallChocolateyArguments -allow_downgrade $allow_downgrade `
-        -allow_empty_checksums $allow_empty_checksums -allow_prerelease $allow_prerelease `
-        -architecture $architecture -force $force -ignore_checksums $ignore_checksums `
-        -ignore_dependencies $ignore_dependencies -install_args $install_args `
-        -package_params $package_params -proxy_url $proxy_url -proxy_username $proxy_username `
-        -proxy_password $proxy_password -skip_scripts $skip_scripts -source $source `
-        -source_username $source_username -source_password $source_password -timeout $timeout `
-        -version $version -choco_cmd_options $choco_cmd_options
+        -allow_empty_checksums $allow_empty_checksums -allowmultiple $allowmultiple `
+        -allow_prerelease $allow_prerelease -architecture $architecture -force $force `
+        -ignore_checksums $ignore_checksums -ignore_dependencies $ignore_dependencies `
+        -install_args $install_args -package_params $package_params -proxy_url $proxy_url `
+        -proxy_username $proxy_username -proxy_password $proxy_password `
+        -skip_scripts $skip_scripts -source $source -source_username $source_username `
+        -source_password $source_password -timeout $timeout -version $version
     $arguments.AddRange($common_args)
 
     $command = Argv-ToString -arguments $arguments
@@ -541,6 +544,7 @@ if ($state -in @("downgrade", "latest", "present", "reinstalled")) {
         choco_path = $choco_path
         allow_downgrade = ($state -eq "downgrade")
         allow_empty_checksums = $allow_empty_checksums
+        allowmultiple = $allowmultiple
         allow_prerelease = $allow_prerelease
         architecture = $architecture
         force = $force
@@ -557,7 +561,6 @@ if ($state -in @("downgrade", "latest", "present", "reinstalled")) {
         source_password = $source_password
         timeout = $timeout
         version = $version
-        choco_cmd_options = $choco_cmd_options
     }
 
     if ($null -ne $missing_packages) {
